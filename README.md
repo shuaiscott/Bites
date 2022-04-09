@@ -1,8 +1,10 @@
 # Bites
+
 Entire IT stack for webapp
 
 
 ## MVP Requirements
+
 - All secrets/config properties are stored in .env
 - Deploy Infrastructure via Terraform
     - Internal network for DB/Backend/Load balancer communication
@@ -36,6 +38,7 @@ Entire IT stack for webapp
     - DB contains fruit configuration data (how many bites it takes, name)
 
 ## Wishlist
+
 - Websocket in Spring Boot to show live locations on map of any bites taken with a 30 second fade-out
 - Kubernetes version of the app
 - Ansible for configuration management
@@ -43,3 +46,4 @@ Entire IT stack for webapp
 - Fullstory integration for troubleshooting
 - VPN to internal 'corporate' network
 - Istio Service Mesh
+- Use GraalVM and/or Quarkus
