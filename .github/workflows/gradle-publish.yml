@@ -9,7 +9,7 @@ name: Gradle Package
 
 on:
   push:
-    paths: 'fruit-microservice/**'
+    # paths: 'fruit-microservice/**'
 
 env:
   SPRING_PROFILES_ACTIVE: cicd
