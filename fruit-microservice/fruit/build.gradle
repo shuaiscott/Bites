@@ -3,6 +3,7 @@ plugins {
 	id 'io.spring.dependency-management' version '1.0.11.RELEASE'
 	id 'java'
 	id "org.flywaydb.flyway" version "8.5.7"
+	id "io.freefair.lombok" version "6.4.2"
 }
 
 group = 'com.bites'

@@ -26,7 +26,7 @@ Entire IT stack for webapp
     - /meals POST endpoint
         - Creates a new meal id
         - Returns meal id
-    - /bites PUT endpoint
+    - /bites POST endpoint
         - Records a bite event occurring
         - Collects info for geolocation purposes (IP or other data)
         - Sends meal id to track bites
