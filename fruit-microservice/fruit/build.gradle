@@ -4,6 +4,7 @@ plugins {
 	id 'java'
 	id "org.flywaydb.flyway" version "8.5.7"
 	id "io.freefair.lombok" version "6.4.2"
+	id("maven-publish")
 }
 
 group = 'com.bites'
@@ -16,8 +17,22 @@ configurations {
 	}
 }
 
-repositories {
-	mavenCentral()
+publishing {
+    repositories {
+        maven {
+            name = "GitHubPackages"
+            url = uri("https://maven.pkg.github.com/shuaiscott/Bites")
+            credentials {
+                username = project.findProperty("gpr.user") ?: System.getenv("USERNAME")
+                password = project.findProperty("gpr.key") ?: System.getenv("TOKEN")
+            }
+        }
+    }
+    publications {
+        gpr(MavenPublication) {
+            from(components.java)
+        }
+    }
 }
 
 dependencies {
