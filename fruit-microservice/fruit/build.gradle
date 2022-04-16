@@ -17,6 +17,10 @@ configurations {
 	}
 }
 
+repositories {
+	mavenCentral()
+}
+
 publishing {
     repositories {
         maven {
