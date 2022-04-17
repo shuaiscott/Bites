@@ -9,6 +9,11 @@ terraform {
   required_version = ">= 0.14.9"
 }
 
+resource "aws_key_pair" "deployer" {
+  key_name   = "deployer-key"
+  public_key = "ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQDcXU4MSp67vFdnTZlB8DV8pSbDqVmSR9IkHBt1r9MfA+Q429cTy3tmavpu3Eb0bgulskOPB38HWa2Z5HdQxgC/lELY8zdvJNyN67NfTUT7ihSMOty4ndIRMo6w6cdDWw34yVcoBR7ZUzKU6MwCZDwBJHPCfeUB4R6YqXwI+K4eY499YMRn4kQzDJpeCYWMSH6Pz0z0mHpYTFGUbOnC35QauRoCtDpFmesfTu6KRsez67cmmR/Sztnys4xnwEgi4D+VGCsgH+ezoZ2/nK+vgHKU58kKE04S0tqhNd0DUtyIqkI7Suns35Fa3GQsXjaliSdi3AOAQpERiWFKgFIc3JPD"
+}
+
 provider "aws" {
   profile = "default"
   region  = "us-west-1"
@@ -27,8 +32,26 @@ resource "aws_subnet" "main" {
   }
 }
 
-resource "aws_internet_gateway" "main-gw" {
+resource "aws_internet_gateway" "main" {
   vpc_id = aws_vpc.main.id
+}
+
+resource "aws_route_table" "main" {
+  vpc_id = aws_vpc.main.id
+
+  route {
+    cidr_block = "0.0.0.0/0"
+    gateway_id = aws_internet_gateway.main.id
+  }
+
+  tags = {
+    Name = "main-route-table"
+  }
+}
+
+resource "aws_route_table_association" "subnet-association" {
+  subnet_id      = aws_subnet.main.id
+  route_table_id = aws_route_table.main.id
 }
 
 resource "aws_security_group" "allow_tls" {
@@ -44,6 +67,34 @@ resource "aws_security_group" "allow_tls" {
     cidr_blocks = [aws_vpc.main.cidr_block]
   }
 
+  tags = {
+    Name = "allow_tls"
+  }
+}
+
+resource "aws_security_group" "allow_ssh" {
+  name        = "allow_ssh"
+  description = "Allow Public SSH inbound traffic"
+  vpc_id      = aws_vpc.main.id
+
+  ingress {
+    description = "Public SSH Access"
+    from_port   = 22
+    to_port     = 22
+    protocol    = "tcp"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+
+  tags = {
+    Name = "allow_ssh"
+  }
+}
+
+resource "aws_security_group" "block_egress" {
+  name        = "block_egress"
+  description = "Block all outbound"
+  vpc_id      = aws_vpc.main.id
+
   egress {
     from_port        = 0
     to_port          = 0
@@ -53,15 +104,19 @@ resource "aws_security_group" "allow_tls" {
   }
 
   tags = {
-    Name = "allow_tls"
+    Name = "block_egress"
   }
 }
 
 resource "aws_instance" "app_server_1" {
-  ami                    = "ami-0528712befcd5d885"
-  instance_type          = "t2.micro"
-  subnet_id              = aws_subnet.main.id
-  vpc_security_group_ids = [aws_security_group.allow_tls.id, aws_security_group.allow_elb.id]
+  ami                         = "ami-0528712befcd5d885"
+  instance_type               = "t2.micro"
+  subnet_id                   = aws_subnet.main.id
+  vpc_security_group_ids      = [aws_security_group.allow_tls.id, aws_security_group.allow_elb.id, aws_security_group.allow_ssh.id, aws_security_group.block_egress.id]
+  associate_public_ip_address = true
+  key_name                    = aws_key_pair.deployer.key_name
+
+  depends_on = [aws_internet_gateway.main]
 
   tags = {
     Name = "fruit-microservice"
@@ -69,10 +124,14 @@ resource "aws_instance" "app_server_1" {
 }
 
 resource "aws_instance" "app_server_2" {
-  ami                    = "ami-0528712befcd5d885"
-  instance_type          = "t2.micro"
-  subnet_id              = aws_subnet.main.id
-  vpc_security_group_ids = [aws_security_group.allow_tls.id, aws_security_group.allow_elb.id]
+  ami                         = "ami-0528712befcd5d885"
+  instance_type               = "t2.micro"
+  subnet_id                   = aws_subnet.main.id
+  vpc_security_group_ids      = [aws_security_group.allow_tls.id, aws_security_group.allow_elb.id, aws_security_group.allow_ssh.id, aws_security_group.block_egress.id]
+  associate_public_ip_address = true
+  key_name                    = aws_key_pair.deployer.key_name
+
+  depends_on = [aws_internet_gateway.main]
 
   tags = {
     Name = "fruit-microservice"
@@ -92,14 +151,6 @@ resource "aws_security_group" "allow_elb" {
     cidr_blocks = [aws_vpc.main.cidr_block]
   }
 
-  egress {
-    from_port        = 0
-    to_port          = 0
-    protocol         = "-1"
-    cidr_blocks      = ["0.0.0.0/0"]
-    ipv6_cidr_blocks = ["::/0"]
-  }
-
   tags = {
     Name = "allow_elb"
   }
@@ -116,7 +167,7 @@ resource "aws_s3_bucket" "logs-bucket" {
 
 resource "aws_s3_bucket_acl" "logs-bucket" {
   bucket = aws_s3_bucket.logs-bucket.id
-  acl = "private"
+  acl    = "private"
 }
 
 resource "aws_s3_bucket_policy" "logs-bucket" {
@@ -148,7 +199,7 @@ data "aws_iam_policy_document" "s3_bucket_lb_write" {
     actions = [
       "s3:PutObject"
     ]
-    effect = "Allow"
+    effect    = "Allow"
     resources = ["${aws_s3_bucket.logs-bucket.arn}/*"]
     principals {
       identifiers = ["delivery.logs.amazonaws.com"]
@@ -161,7 +212,7 @@ data "aws_iam_policy_document" "s3_bucket_lb_write" {
     actions = [
       "s3:GetBucketAcl"
     ]
-    effect = "Allow"
+    effect    = "Allow"
     resources = ["${aws_s3_bucket.logs-bucket.arn}"]
     principals {
       identifiers = ["delivery.logs.amazonaws.com"]
@@ -216,7 +267,7 @@ resource "aws_elb" "fruit-elb" {
   connection_draining         = true
   connection_draining_timeout = 400
 
-  depends_on = [aws_internet_gateway.main-gw]
+  depends_on = [aws_internet_gateway.main]
 
   tags = {
     Name = "fruit-elb"
