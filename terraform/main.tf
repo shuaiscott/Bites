@@ -1,81 +1,66 @@
-terraform {
-  required_providers {
-    aws = {
-      source  = "hashicorp/aws"
-      version = "~> 3.27"
-    }
-  }
+provider "aws" {
+  profile = "default"
+  region  = "us-west-1" # TODO add to variables
+}
 
-  required_version = ">= 0.14.9"
+locals {
+  name   = "bites-fruit"
+  region = "us-west-1"
+  tags = {
+    App         = "fruit"
+    Environment = "production"
+  }
 }
 
 resource "aws_key_pair" "deployer" {
-  key_name   = "deployer-key"
+  key_name   = "terraform-key"
   public_key = "ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQDcXU4MSp67vFdnTZlB8DV8pSbDqVmSR9IkHBt1r9MfA+Q429cTy3tmavpu3Eb0bgulskOPB38HWa2Z5HdQxgC/lELY8zdvJNyN67NfTUT7ihSMOty4ndIRMo6w6cdDWw34yVcoBR7ZUzKU6MwCZDwBJHPCfeUB4R6YqXwI+K4eY499YMRn4kQzDJpeCYWMSH6Pz0z0mHpYTFGUbOnC35QauRoCtDpFmesfTu6KRsez67cmmR/Sztnys4xnwEgi4D+VGCsgH+ezoZ2/nK+vgHKU58kKE04S0tqhNd0DUtyIqkI7Suns35Fa3GQsXjaliSdi3AOAQpERiWFKgFIc3JPD"
+  tags       = local.tags
 }
 
-provider "aws" {
-  profile = "default"
-  region  = "us-west-1"
-}
+module "vpc" {
+  source  = "terraform-aws-modules/vpc/aws"
+  version = "~> 3.0"
 
-resource "aws_vpc" "main" {
-  cidr_block = "10.0.0.0/16"
-}
+  name = local.name
+  cidr = "10.0.0.0/16"
 
-resource "aws_subnet" "main" {
-  vpc_id     = aws_vpc.main.id
-  cidr_block = "10.0.1.0/24"
+  azs              = ["${local.region}a", "${local.region}c"]
+  public_subnets   = ["10.0.0.0/24", "10.0.2.0/24"]
+  private_subnets  = ["10.0.3.0/24", "10.0.5.0/24"]
+  database_subnets = ["10.0.7.0/24", "10.0.9.0/24"]
 
-  tags = {
-    Name = "Main"
-  }
-}
+  create_database_subnet_group       = true
+  create_database_subnet_route_table = true
 
-resource "aws_internet_gateway" "main" {
-  vpc_id = aws_vpc.main.id
-}
+  enable_nat_gateway = false
 
-resource "aws_route_table" "main" {
-  vpc_id = aws_vpc.main.id
+  enable_dns_support   = true
+  enable_dns_hostnames = true
 
-  route {
-    cidr_block = "0.0.0.0/0"
-    gateway_id = aws_internet_gateway.main.id
-  }
-
-  tags = {
-    Name = "main-route-table"
-  }
-}
-
-resource "aws_route_table_association" "subnet-association" {
-  subnet_id      = aws_subnet.main.id
-  route_table_id = aws_route_table.main.id
+  tags = local.tags
 }
 
 resource "aws_security_group" "allow_tls" {
   name        = "allow_tls"
   description = "Allow TLS inbound traffic"
-  vpc_id      = aws_vpc.main.id
+  vpc_id      = module.vpc.vpc_id
 
   ingress {
     description = "TLS from VPC"
     from_port   = 443
     to_port     = 443
     protocol    = "tcp"
-    cidr_blocks = [aws_vpc.main.cidr_block]
+    cidr_blocks = module.vpc.private_subnets_cidr_blocks
   }
 
-  tags = {
-    Name = "allow_tls"
-  }
+  tags = local.tags
 }
 
 resource "aws_security_group" "allow_ssh" {
   name        = "allow_ssh"
   description = "Allow Public SSH inbound traffic"
-  vpc_id      = aws_vpc.main.id
+  vpc_id      = module.vpc.vpc_id
 
   ingress {
     description = "Public SSH Access"
@@ -85,84 +70,155 @@ resource "aws_security_group" "allow_ssh" {
     cidr_blocks = ["0.0.0.0/0"]
   }
 
-  tags = {
-    Name = "allow_ssh"
-  }
+  tags = local.tags
 }
 
-resource "aws_security_group" "block_egress" {
-  name        = "block_egress"
-  description = "Block all outbound"
-  vpc_id      = aws_vpc.main.id
+resource "aws_security_group" "allow_postgres_egress" {
+  name        = "allow_postgres_egress"
+  description = "Allow Postgres outbound traffic"
+  vpc_id      = module.vpc.vpc_id
 
   egress {
-    from_port        = 0
-    to_port          = 0
-    protocol         = "-1"
-    cidr_blocks      = ["0.0.0.0/0"]
-    ipv6_cidr_blocks = ["::/0"]
+    description = "Postgres Access"
+    from_port   = 5432
+    to_port     = 5432
+    protocol    = "tcp"
+    cidr_blocks = module.vpc.private_subnets_cidr_blocks
   }
 
-  tags = {
-    Name = "block_egress"
-  }
+  tags = local.tags
 }
 
-resource "aws_instance" "app_server_1" {
-  ami                         = "ami-0528712befcd5d885"
-  instance_type               = "t2.micro"
-  subnet_id                   = aws_subnet.main.id
-  vpc_security_group_ids      = [aws_security_group.allow_tls.id, aws_security_group.allow_elb.id, aws_security_group.allow_ssh.id, aws_security_group.block_egress.id]
-  associate_public_ip_address = true
-  key_name                    = aws_key_pair.deployer.key_name
-
-  depends_on = [aws_internet_gateway.main]
-
-  tags = {
-    Name = "fruit-microservice"
-  }
-}
-
-resource "aws_instance" "app_server_2" {
-  ami                         = "ami-0528712befcd5d885"
-  instance_type               = "t2.micro"
-  subnet_id                   = aws_subnet.main.id
-  vpc_security_group_ids      = [aws_security_group.allow_tls.id, aws_security_group.allow_elb.id, aws_security_group.allow_ssh.id, aws_security_group.block_egress.id]
-  associate_public_ip_address = true
-  key_name                    = aws_key_pair.deployer.key_name
-
-  depends_on = [aws_internet_gateway.main]
-
-  tags = {
-    Name = "fruit-microservice"
-  }
-}
-
-resource "aws_security_group" "allow_elb" {
-  name        = "allow_elb"
-  description = "Allow HTTP inbound traffic for Load Balancers"
-  vpc_id      = aws_vpc.main.id
+resource "aws_security_group" "allow_internal_http" {
+  name        = "allow_http"
+  description = "Allow HTTP inbound traffic"
+  vpc_id      = module.vpc.vpc_id
 
   ingress {
-    description = "HTTP from Load Balancer"
+    description = "Allow internal HTTP traffic"
     from_port   = 80
     to_port     = 80
     protocol    = "tcp"
-    cidr_blocks = [aws_vpc.main.cidr_block]
+    cidr_blocks = module.vpc.public_subnets_cidr_blocks
   }
 
-  tags = {
-    Name = "allow_elb"
+  tags = local.tags
+}
+
+resource "aws_security_group" "allow_elb_http" {
+  name        = "allow_elb_http"
+  description = "Allow ingress/egress HTTP traffic for load balancer"
+  vpc_id      = module.vpc.vpc_id
+
+  ingress {
+    description = "HTTP from anywhere"
+    from_port   = 80
+    to_port     = 80
+    protocol    = "tcp"
+    cidr_blocks = ["0.0.0.0/0"]
   }
+
+  egress {
+    description = "HTTP to public subnets"
+    from_port   = 80
+    to_port     = 80
+    protocol    = "tcp"
+    cidr_blocks = module.vpc.public_subnets_cidr_blocks
+  }
+
+  tags = local.tags
+}
+
+module "fruit_instances_a" {
+  source  = "terraform-aws-modules/ec2-instance/aws"
+  version = "~> 3.0"
+
+  for_each = toset(["1"])
+
+  name = "fruit-service-a-${each.key}"
+
+  ami           = "ami-0528712befcd5d885"
+  instance_type = "t2.micro"
+  key_name      = aws_key_pair.deployer.key_name
+  monitoring    = true
+  vpc_security_group_ids = [
+    module.vpc.default_security_group_id,
+    aws_security_group.allow_internal_http.id,
+    aws_security_group.allow_ssh.id,
+    aws_security_group.allow_postgres_egress.id
+  ]
+  subnet_id = module.vpc.public_subnets[0]
+
+  tags = local.tags
+}
+
+module "fruit_instances_b" {
+  source  = "terraform-aws-modules/ec2-instance/aws"
+  version = "~> 3.0"
+
+  for_each = toset(["1"])
+
+  name = "fruit-service-b-${each.key}"
+
+  ami           = "ami-0528712befcd5d885"
+  instance_type = "t2.micro"
+  key_name      = aws_key_pair.deployer.key_name
+  monitoring    = true
+  vpc_security_group_ids = [
+    module.vpc.default_security_group_id,
+    aws_security_group.allow_internal_http.id,
+    aws_security_group.allow_ssh.id,
+    aws_security_group.allow_postgres_egress.id
+  ]
+  subnet_id = module.vpc.public_subnets[1]
+
+  tags = local.tags
+}
+
+module "fruit-db" {
+  source = "terraform-aws-modules/rds/aws"
+
+  identifier = "fruit-db"
+
+  engine               = "postgres"
+  engine_version       = "13.3"
+  family               = "postgres13"
+  major_engine_version = "13"
+  instance_class       = "db.t4g.micro"
+  allocated_storage    = 5
+
+  db_name  = "fruit"
+  username = "fruit_worker"
+  port     = "5432"
+
+  iam_database_authentication_enabled = true
+
+  vpc_security_group_ids = [module.vpc.default_security_group_id]
+
+  maintenance_window = "Mon:00:00-Mon:03:00"
+  backup_window      = "03:00-06:00"
+
+  #   monitoring_interval = "30"
+  #   monitoring_role_name = "MyRDSMonitoringRole"
+  #   create_monitoring_role = true
+
+  # DB subnet mapping
+  subnet_ids           = module.vpc.database_subnets
+  db_subnet_group_name = module.vpc.database_subnet_group_name
+
+  deletion_protection = false # TODO change this when *actually* running prod
+
+  parameters = []
+
+  options = []
+
+  tags = local.tags
 }
 
 resource "aws_s3_bucket" "logs-bucket" {
   bucket = "bitescorp-logs-bucket"
 
-  tags = {
-    Name        = "logs-bucket"
-    Environment = "Production"
-  }
+  tags = local.tags
 }
 
 resource "aws_s3_bucket_acl" "logs-bucket" {
@@ -230,7 +286,8 @@ resource "aws_s3_bucket_public_access_block" "logs-bucket" {
 
 resource "aws_elb" "fruit-elb" {
   name    = "fruit-elb"
-  subnets = [aws_subnet.main.id]
+  subnets = module.vpc.public_subnets
+  security_groups = [aws_security_group.allow_elb_http.id]
 
   access_logs {
     bucket        = aws_s3_bucket.logs-bucket.bucket
@@ -261,17 +318,16 @@ resource "aws_elb" "fruit-elb" {
     interval            = 30
   }
 
-  instances                   = [aws_instance.app_server_1.id, aws_instance.app_server_2.id]
+  instances = concat(
+    [for instance in module.fruit_instances_a : instance.id],
+    [for instance in module.fruit_instances_b : instance.id]
+  )
   cross_zone_load_balancing   = true
   idle_timeout                = 400
   connection_draining         = true
   connection_draining_timeout = 400
 
-  depends_on = [aws_internet_gateway.main]
-
-  tags = {
-    Name = "fruit-elb"
-  }
+  tags = local.tags
 }
 
 resource "aws_lb_cookie_stickiness_policy" "fruit-elb-sticky-policy" {

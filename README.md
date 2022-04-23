@@ -47,3 +47,5 @@ Entire IT stack for webapp
 - VPN to internal 'corporate' network
 - Istio Service Mesh
 - Use GraalVM and/or Quarkus
+- Global Aurora DB cluster
+- AWS Global Accelerator (US East, US West, Europe, Asia)
