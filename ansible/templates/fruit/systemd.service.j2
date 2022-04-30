@@ -1,0 +1,11 @@
+[Unit]
+Description={{ service_description }}
+After=syslog.target
+
+[Service]
+User={{ service_user }}
+ExecStart={{ service_exec }}
+SuccessExitStatus=143
+
+[Install]
+WantedBy=multi-user.target

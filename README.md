@@ -3,6 +3,24 @@
 Entire IT stack for webapp
 
 
+## Get Started
+
+Requirements:
+
+- Terraform CLI installed
+- AWS CLI installed
+- AWS CLI user/key configured
+
+```bash
+cd terraform
+terraform init
+terraform apply
+
+cd ..
+
+```
+
+
 ## MVP Requirements
 
 - All secrets/config properties are stored in .env

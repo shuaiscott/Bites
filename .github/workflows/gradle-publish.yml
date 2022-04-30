@@ -16,7 +16,7 @@ env:
   SPRING_PROFILES_ACTIVE: cicd
 
 jobs:
-  build:
+  publish:
 
     runs-on: ubuntu-latest
     container: node:latest

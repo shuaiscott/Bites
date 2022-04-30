@@ -285,8 +285,8 @@ resource "aws_s3_bucket_public_access_block" "logs-bucket" {
 }
 
 resource "aws_elb" "fruit-elb" {
-  name    = "fruit-elb"
-  subnets = module.vpc.public_subnets
+  name            = "fruit-elb"
+  subnets         = module.vpc.public_subnets
   security_groups = [aws_security_group.allow_elb_http.id]
 
   access_logs {

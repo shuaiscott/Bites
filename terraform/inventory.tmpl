@@ -1,0 +1,11 @@
+[fruitbackend]
+%{ for index, instance in fruit_service_hostnames ~}
+${ instance }
+%{ endfor ~}
+
+[fruitbackend:vars]
+ansible_user=admin
+db_hostname=${ fruit_db_hostname }
+db_port=${ fruit_db_port }
+db_name=${ fruit_db_name }
+db_username=${ fruit_db_username }

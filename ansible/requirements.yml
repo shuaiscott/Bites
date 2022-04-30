@@ -1,0 +1,5 @@
+- src: git+https://gitlab.intesys.it/tech-shared/springboot-ansible-role.git
+  version: 1.2.1
+  name: intesys.springboot-ansible-role
+
+- src: nginxinc.nginx_core
