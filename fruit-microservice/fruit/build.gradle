@@ -9,7 +9,7 @@ plugins {
 }
 
 group = 'com.bites'
-version = gitVersion()
+version = versionDetails().lastTag
 sourceCompatibility = '11'
 
 configurations {
