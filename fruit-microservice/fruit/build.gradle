@@ -2,13 +2,14 @@ plugins {
 	id 'org.springframework.boot' version '2.6.6'
 	id 'io.spring.dependency-management' version '1.0.11.RELEASE'
 	id 'java'
-	id "org.flywaydb.flyway" version "8.5.7"
-	id "io.freefair.lombok" version "6.4.2"
-	id("maven-publish")
+	id 'org.flywaydb.flyway' version '8.5.7'
+	id 'io.freefair.lombok' version '6.4.2'
+	id 'maven-publish'
+	id 'com.palantir.git-version' version '0.15.0'
 }
 
 group = 'com.bites'
-version = '1.0.0'
+version = gitVersion()
 sourceCompatibility = '11'
 
 configurations {
