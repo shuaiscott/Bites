@@ -13,13 +13,21 @@ Requirements:
 
 ```bash
 cd terraform
+
 terraform init
 terraform apply
 
-cd ..
+# Update password in AWS RDS instance manually
+
+cd ../ansible
+
+# Set "db_password" and "github_maven_pat" in vault.yml
+
+ansible-galaxy install -r requirements.yml
+ansible-playbook build-deploy-fruit-instances.yml -i inventory -e @vault.yml --ask-vault-pass
+ansible-playbook install-nginx-proxy.yml -i inventory
 
 ```
-
 
 ## MVP Requirements
 

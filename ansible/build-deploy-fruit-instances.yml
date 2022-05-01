@@ -41,8 +41,8 @@
         - /app/a
         - /app/b
 
-    - name: Download an artifact from a private repository requiring authentication
-      # no_log: true
+    - name: Download fruit app JAR
+      no_log: true
       become: yes
       community.general.maven_artifact:
         group_id: com.bites
@@ -78,9 +78,11 @@
         owner: springboot
         group: springboot
         mode: 0700
+      vars:
+        app_port: "{{ item.app_port }}"
       loop:
-        - { slot: 'a'}
-        - { slot: 'b'}
+        - { slot: 'a', app_port: 8081 }
+        - { slot: 'b', app_port: 8082 }
 
     - name: Install Slot(s) Systemd
       become: yes
@@ -109,39 +111,3 @@
       loop:
         - { slot: 'a' }
         - { slot: 'b' }
-
-    # # NGINX Install and configuration
-    # - name: Install NGINX
-    #   ansible.builtin.include_role:
-    #     name: nginx
-    
-    # - name: Configure NGINX
-    #   ansible.builtin.include_role:
-    #     name: nginx_config
-    #   vars:
-    #     nginx_config_http_template_enable: true
-    #     nginx_config_http_template:
-    #       - template_file: http/default.conf.j2
-    #         deployment_location: /etc/nginx/conf.d/default.conf
-    #         config:
-    #           upstreams:
-    #             - name: upstr
-    #               least_conn: true
-    #               servers:
-    #                 - address: 0.0.0.0:8081
-    #           servers:
-    #             - core:
-    #                 listen:
-    #                   - port: 80
-    #                 server_name: localhost
-    #               log:
-    #                 access:
-    #                   - path: /var/log/nginx/access.log
-    #                     format: main
-    #               locations:
-    #                 - location: /
-    #                   proxy:
-    #                     pass: http://upstr/
-    #                     set_header:
-    #                       field: Host
-    #                       value: $host

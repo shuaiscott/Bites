@@ -1,0 +1,107 @@
+---
+- name: Deploy Fruit Backend
+  hosts: fruitbackend
+  collections:
+    - nginxinc.nginx_core
+  tasks:
+    - name: Install GNUpg2 (gpg)
+      become: yes
+      apt:
+        name: gnupg2
+
+    - name: Install NGINX
+      ansible.builtin.include_role:
+        name: nginx
+        apply: 
+          become: yes
+      vars:
+        nginx_logrotate_conf_enable: true
+        nginx_logrotate_conf:
+          paths:
+            - /var/log/nginx/*.log
+          options:
+            - daily
+            - missingok
+            - rotate 14
+            - compress
+            - delaycompress
+            - notifempty
+            - sharedscripts
+
+    
+    - name: Create NGINX A-Live/B-Stage config
+      ansible.builtin.include_role:
+        name: nginx_config
+        apply: 
+          become: yes
+      vars:
+        nginx_config_http_template_enable: true
+        nginx_config_http_template:
+          - template_file: http/default.conf.j2
+            deployment_location: "/etc/nginx/{{ item.green_slot }}-live/default.conf"
+            config:
+              upstreams:
+                - name: slot-a
+                  least_conn: true
+                  servers:
+                    - address: 0.0.0.0:8081
+                - name: slot-b
+                  least_conn: true
+                  servers:
+                    - address: 0.0.0.0:8082
+              servers:
+                - core:
+                    listen:
+                      - port: 80
+                    server_name: localhost
+                  log:
+                    access:
+                      - path: /var/log/nginx/access.log
+                        format: main
+                  locations:
+                    - location: /
+                      proxy:
+                        pass: "http://slot-{{ item.green_slot }}/"
+                        set_header:
+                          field: Host
+                          value: $host
+                - core:
+                    listen:
+                      - port: 81
+                    server_name: localhost
+                  log:
+                    access:
+                      - path: /var/log/nginx/access-staging.log
+                        format: main
+                  locations:
+                    - location: /
+                      proxy:
+                        pass: "http://slot-{{ item.blue_slot }}/"
+                        set_header:
+                          field: Host
+                          value: $host
+      loop: 
+      - { green_slot: a, blue_slot: b  }
+    
+    # Delete conf.d so we can setup sym-links
+    - name: Delete default NGINX config
+      become: yes
+      file:
+        path: /etc/nginx/conf.d/
+        state: absent
+
+
+    - name: Create a symbolic link to A-Live config
+      become: yes
+      ansible.builtin.file:
+        src: /etc/nginx/a-live
+        dest: /etc/nginx/conf.d
+        owner: root
+        group: root
+        state: link
+
+    - name: Reload service nginx after links created
+      become: yes
+      ansible.builtin.systemd:
+        name: nginx.service
+        state: reloaded
