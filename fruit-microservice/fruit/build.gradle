@@ -34,8 +34,8 @@ publishing {
         }
     }
     publications {
-        gpr(MavenPublication) {
-            from(components.java)
+        mavenJava(MavenPublication) {
+            artifact jar
         }
     }
 }
@@ -59,6 +59,7 @@ tasks.named('test') {
 }
 
 bootJar {
+
     launchScript()
 }
 
