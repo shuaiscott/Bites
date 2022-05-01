@@ -68,7 +68,7 @@ jobs:
     - name: Build BootJar with Gradle
       uses: gradle/gradle-build-action@0d13054264b0bb894ded474f08ebb30921341cee
       with:
-        arguments: build
+        arguments: bootJar
         build-root-directory: fruit-microservice/fruit
 
     # The USERNAME and TOKEN need to correspond to the credentials environment variables used in
