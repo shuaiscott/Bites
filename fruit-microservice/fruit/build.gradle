@@ -65,4 +65,5 @@ bootJar {
 jar {
    enabled = true
    archiveClassifier = '' //use empty string
+   launchScript()
 }
