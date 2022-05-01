@@ -61,3 +61,8 @@ tasks.named('test') {
 bootJar {
     launchScript()
 }
+
+jar {
+   enabled = true
+   archiveClassifier = '' //use empty string
+}
