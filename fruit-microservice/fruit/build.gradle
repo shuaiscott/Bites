@@ -16,6 +16,7 @@ configurations {
 	compileOnly {
 		extendsFrom annotationProcessor
 	}
+	newRelic
 }
 
 repositories {
@@ -47,6 +48,7 @@ dependencies {
 	implementation 'org.flywaydb:flyway-core'
 	implementation 'org.modelmapper:modelmapper:3.0.0'
 	implementation 'javax.validation:validation-api:2.0.1.Final'
+	newRelic group: 'com.newrelic.agent.java', name: 'newrelic-agent', version: '7.6.0'
 	compileOnly 'org.projectlombok:lombok'
 	runtimeOnly 'io.micrometer:micrometer-registry-prometheus'
 	runtimeOnly 'org.postgresql:postgresql'
@@ -67,3 +69,11 @@ jar {
    enabled = true
    archiveClassifier = '' //use empty string
 }
+
+task copyNewRelic(type: Copy) {
+    from configurations.newRelic
+    into "${project.buildDir}/libs"
+    rename { it.substring(0, it.indexOf("-")) + it.substring(it.lastIndexOf("."), it.size()) }
+}
+
+assemble.dependsOn copyNewRelic
