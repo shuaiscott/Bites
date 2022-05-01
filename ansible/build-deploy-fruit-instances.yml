@@ -9,10 +9,17 @@
       java_packages:
         - openjdk-11-jdk
       become: yes
+  vars:
+    environment_file: "/etc/fruit/environment"
   tasks:
     - name: Update apt-get repo and cache & Upgrade
       apt: update_cache=yes upgrade=dist force_apt_get=yes cache_valid_time=3600
       become: yes
+
+    - name: Install Python lxml
+      become: yes
+      apt:
+        name: python3-lxml
 
     - name: Add the springboot user
       become: yes
@@ -34,23 +41,48 @@
         - /app/a
         - /app/b
 
-    - name: Download latest Fruit app
-      no_log: true
+    - name: Download an artifact from a private repository requiring authentication
+      # no_log: true
       become: yes
-      get_url:
-        url: https://maven.pkg.github.com/shuaiscott/Bites/com/bites/fruit/1.0.0/fruit-1.0.0-plain.jar
-        dest: /app/{{ item.slot }}/fruit.jar
+      community.general.maven_artifact:
+        group_id: com.bites
+        artifact_id: fruit
+        version: latest
+        verify_checksum: always
+        repository_url: 'https://maven.pkg.github.com/shuaiscott/Bites'
         username: _
         password: '{{ github_maven_pat }}'
+        dest: /app/{{ item.slot }}/fruit.jar
         owner: springboot
         group: springboot
-        mode: 0644
+        mode: 0744
       loop:
         - { slot: 'a' }
         - { slot: 'b' }
 
     # Install Systemd services
-    - name: Install Slot A Systemd
+    - name: Make Systemd environment directory
+      become: yes
+      file:
+        path: "/etc/fruit/"
+        state: directory
+        owner: springboot
+        group: springboot
+        mode: 0700
+    
+    - name: Install Systemd Environment file
+      become: yes
+      template:
+        src: templates/fruit/systemd-environment.j2
+        dest: '{{ environment_file }}.{{ item.slot }}'
+        owner: springboot
+        group: springboot
+        mode: 0700
+      loop:
+        - { slot: 'a'}
+        - { slot: 'b'}
+
+    - name: Install Slot(s) Systemd
       become: yes
       template:
         src: templates/fruit/systemd.service.j2
@@ -62,6 +94,7 @@
         service_exec: "/app/{{ item.slot }}/fruit.jar"
         service_description: "Fruit Service Slot {{ item.slot | capitalize }}"
         service_user: springboot
+        service_env_file: '{{ environment_file }}.{{ item.slot }}'
       loop:
         - { slot: 'a' }
         - { slot: 'b' }
@@ -72,6 +105,7 @@
         name: fruit-{{ item.slot }}.service
         state: started
         enabled: yes
+        daemon_reload: yes
       loop:
         - { slot: 'a' }
         - { slot: 'b' }

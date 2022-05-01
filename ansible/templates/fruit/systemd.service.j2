@@ -3,6 +3,7 @@ Description={{ service_description }}
 After=syslog.target
 
 [Service]
+EnvironmentFile={{ service_env_file }}
 User={{ service_user }}
 ExecStart={{ service_exec }}
 SuccessExitStatus=143
