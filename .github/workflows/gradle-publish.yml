@@ -10,7 +10,6 @@ name: Gradle Package
 on:
   release:
     types: [created]
-    paths: 'fruit-microservice/**'
 
 env:
   SPRING_PROFILES_ACTIVE: cicd
@@ -61,6 +60,12 @@ jobs:
         settings-path: ${{ github.workspace }} # location for the settings.xml file
 
     - name: Build with Gradle
+      uses: gradle/gradle-build-action@0d13054264b0bb894ded474f08ebb30921341cee
+      with:
+        arguments: build
+        build-root-directory: fruit-microservice/fruit
+
+    - name: Build BootJar with Gradle
       uses: gradle/gradle-build-action@0d13054264b0bb894ded474f08ebb30921341cee
       with:
         arguments: build
