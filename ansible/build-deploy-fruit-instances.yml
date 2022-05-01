@@ -3,6 +3,10 @@
   hosts: fruitbackend
   collections:
     - nginxinc.nginx_core
+  pre_tasks:
+    - name: Update apt cache and Upgrade packages
+      apt: update_cache=yes upgrade=dist force_apt_get=yes cache_valid_time=3600
+      become: yes
   roles:
     - role: geerlingguy.java
       when: "ansible_os_family == 'Debian'"
@@ -12,14 +16,12 @@
   vars:
     environment_file: "/etc/fruit/environment"
   tasks:
-    - name: Update apt-get repo and cache & Upgrade
-      apt: update_cache=yes upgrade=dist force_apt_get=yes cache_valid_time=3600
-      become: yes
-
-    - name: Install Python lxml
+    - name: Install Python lxml, unzip
       become: yes
       apt:
-        name: python3-lxml
+        name: 
+          - python3-lxml
+          - unzip
 
     - name: Add the springboot user
       become: yes
@@ -60,6 +62,20 @@
         - { slot: 'a' }
         - { slot: 'b' }
 
+    - include_role:
+       name: newrelic.newrelic_java_agent
+      vars:
+        nr_java_agent_config:
+          license_key: "{{ new_relic_key }}"
+          app_name: "fruit-service"
+          log_file_path: /tmp/newrelic
+        server_type: tomcat
+        server_root: /app/
+        jvm_conf_file: /tmp/setenv.sh
+        server_user: springboot
+        server_group: springboot
+        restart_web_server: false
+
     # Install Systemd services
     - name: Make Systemd environment directory
       become: yes
@@ -93,7 +109,7 @@
         group: root
         mode: 0644
       vars:
-        service_exec: "/app/{{ item.slot }}/fruit.jar"
+        service_exec: "java -javaagent:/app/newrelic/newrelic.jar -jar /app/{{ item.slot }}/fruit.jar"
         service_description: "Fruit Service Slot {{ item.slot | capitalize }}"
         service_user: springboot
         service_env_file: '{{ environment_file }}.{{ item.slot }}'

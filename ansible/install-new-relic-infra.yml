@@ -1,0 +1,14 @@
+---
+- name: Install New Relic
+  hosts: fruitbackend
+  pre_tasks:
+    - name: Install GNUpg2 (gpg)
+      become: yes
+      apt:
+        name: gnupg2
+  roles:
+    - role: newrelic.newrelic-infra
+      become: yes
+      vars:
+        nrinfragent_config:
+          license_key: "{{ new_relic_key }}"

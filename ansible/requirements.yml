@@ -5,3 +5,5 @@ collections:
 
 roles:
 - name: geerlingguy.java
+- name: newrelic.newrelic-infra
+- name: newrelic.newrelic_java_agent

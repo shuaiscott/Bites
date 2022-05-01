@@ -314,7 +314,7 @@ resource "aws_elb" "fruit-elb" {
     healthy_threshold   = 2
     unhealthy_threshold = 2
     timeout             = 3
-    target              = "HTTP:80/"
+    target              = "HTTP:80/fruits"
     interval            = 30
   }
 
@@ -336,3 +336,9 @@ resource "aws_lb_cookie_stickiness_policy" "fruit-elb-sticky-policy" {
   lb_port                  = 80
   cookie_expiration_period = 600
 }
+
+# resource "aws_prometheus_workspace" "prod" {
+#   alias = "prometheus-prod"
+
+#   tags = local.tags
+# }
